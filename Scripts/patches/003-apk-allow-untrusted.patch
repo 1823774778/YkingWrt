@@ -1,0 +1,11 @@
+--- a/applications/luci-app-package-manager/root/usr/libexec/package-manager-call
++++ b/applications/luci-app-package-manager/root/usr/libexec/package-manager-call
+@@ -41,6 +41,8 @@
+ 						action="del"
+ 					;;
+ 				esac
++				# Accept unsigned / third-party apk files, not only signed repository packages.
++				[ "$action" = "add" ] && cmd="$cmd --allow-untrusted"
+ 			fi
+ 
+ 			# APK have --autoremove enabled by default and

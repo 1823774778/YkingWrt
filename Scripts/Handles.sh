@@ -45,3 +45,13 @@ FIX "mini-diskmanager" "$PACKAGE_PATH/luci-app-mini-diskmanager" sed -i "s/servi
 FIX "auto-relay-ap" "$PACKAGE_PATH/emortal/luci-app-router-tool" patch -p1 \
 	-d "$PACKAGE_PATH/emortal/luci-app-router-tool" \
 	-i "$GITHUB_WORKSPACE/Scripts/patches/001-auto-relay-ap.patch"
+
+#5G无线默认改为CN国家码+固定非DFS信道，避免自动信道落入雷达信道导致5G不广播
+FIX "wireless-5g-cn" "$PACKAGE_PATH/emortal/luci-app-router-tool" patch -p1 \
+	-d "$PACKAGE_PATH/emortal/luci-app-router-tool" \
+	-i "$GITHUB_WORKSPACE/Scripts/patches/002-wireless-5g-cn.patch"
+
+#软件包管理器允许安装未签名/第三方apk
+FIX "apk-allow-untrusted" "$FEEDS_PATH/luci/applications/luci-app-package-manager" patch -p1 \
+	-d "$FEEDS_PATH/luci/applications/luci-app-package-manager" \
+	-i "$GITHUB_WORKSPACE/Scripts/patches/003-apk-allow-untrusted.patch"
