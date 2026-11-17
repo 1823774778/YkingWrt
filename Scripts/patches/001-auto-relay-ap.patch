@@ -22,7 +22,7 @@
  export function synchronize(uci, data, upstream4, target) {
  	let changed = {};
  	if (uci.get_all('router-tool', 'main')?.['.type'] != 'settings')
-@@ -105,6 +114,90 @@
+@@ -105,6 +114,93 @@
  			changed[config] = true;
  		}
  	}
@@ -38,11 +38,14 @@
 +		let bridge = bridge_id ? uci.get_all('network', bridge_id) : null;
 +		let bridge_name = bridge ? device : 'br-lan';
 +		let wan_dev = uci.get('network', 'wan', 'device') || board_ports('wan')[0];
-+		let ports = bridge ? array(uci.get('network', bridge_id, 'ports')) :
-+			board_ports('lan').concat(device != bridge_name ? [ device ] : []);
++		let ports = bridge ? array(uci.get('network', bridge_id, 'ports')) : board_ports('lan');
++		if (!bridge && device != bridge_name) push(ports, device);
 +		let physical = [];
-+		for (let name in board?.network || {}) physical = concat(physical, board_ports(name));
-+		ports = unique(ports.concat(physical, wan_dev || []));
++		for (let name in board?.network || {})
++			for (let p in board_ports(name)) push(physical, p);
++		for (let p in physical) push(ports, p);
++		if (wan_dev) push(ports, wan_dev);
++		ports = unique(ports);
 +		function skip(reason) {
 +			syslog(LOG_WARNING, 'relay AP conversion skipped: %s', reason);
 +			return false;
@@ -89,7 +92,7 @@
 +		let zlan = zone('lan'), zwan = zone('wan');
 +		for (let s in sections(uci, 'firewall', 'zone')) {
 +			let networks = filter(array(uci.get('firewall', s['.name'], 'network')), n => index([ 'lan', 'wan', 'wan6' ], n) < 0);
-+			if (s['.name'] == zlan) networks = concat(networks, [ 'lan', 'wan6' ]);
++			if (s['.name'] == zlan) push(networks, 'lan', 'wan6');
 +			set('firewall', s['.name'], { network: length(networks) ? networks : null });
 +		}
 +		for (let pair in [ [ 'lan', zlan ], [ 'wan', zwan ] ])
@@ -113,7 +116,7 @@
  	let sid = sections(uci, 'network', 'globals')[0]?.['.name'] || ensure('network', 'globals', 'globals');
  	let ap = uci.get('router-tool', 'main', 'ap_mode') == '1';
  	let role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
-@@ -185,21 +278,26 @@
+@@ -185,21 +281,26 @@
  		recorder = state;
  		let upstream = filter(map(upstream4 || [], address => subnet(address)), address => address != null);
  		let lan = filter(map(array(uci.get('network', 'lan', 'ipaddr')), address => subnet(address, uci.get('network', 'lan', 'netmask'))), address => address != null);
