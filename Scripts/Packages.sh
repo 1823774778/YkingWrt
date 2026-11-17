@@ -80,6 +80,7 @@ UPDATE_PACKAGE "timecontrol" "sirpdboy/luci-app-timecontrol" "main"
 
 UPDATE_PACKAGE "stuntman" "muink/openwrt-stuntman" "master"
 UPDATE_PACKAGE "wifiroam" "1823774778/meshzw" "main"
+UPDATE_PACKAGE "xwrt-ota" "1823774778/openwrt-ota" "main"
 
 UPDATE_PACKAGE "airpi3000m-fancontrol" "LianXia233/luci-app-airpi3000m-fancontrol" "main"
 UPDATE_PACKAGE "chfs" "LianXia233/luci-app-chfs" "main"
