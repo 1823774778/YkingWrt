@@ -1,5 +1,5 @@
---- a/applications/luci-app-package-manager/root/usr/libexec/package-manager-call
-+++ b/applications/luci-app-package-manager/root/usr/libexec/package-manager-call
+--- a/root/usr/libexec/package-manager-call
++++ b/root/usr/libexec/package-manager-call
 @@ -41,6 +41,8 @@
  						action="del"
  					;;

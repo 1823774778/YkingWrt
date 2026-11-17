@@ -34,9 +34,10 @@ Scripts/              Packages.sh 插件更新 / Handles.sh 修补 / Settings.sh
 - 内置 `luci-app-wifiroam` + `wifiroam`（来自 [1823774778/meshzw](https://github.com/1823774778/meshzw)，拓扑视图与 802.11k/v/r 无缝漫游）
 - 不含 homeproxy、gecoosac、natmapt
 - 自动中继AP：LAN 与上游 WAN 下发地址同网段时，自动启用接口页（admin/network/network）的"中继AP模式"（桥接全部网口、LAN 改 DHCP、关闭本机 DHCP）；端口拓扑不满足条件时回退上游的自动改 LAN 网段逻辑。补丁见 `Scripts/patches/001-auto-relay-ap.patch`，由 Handles.sh 应用
-- 5G 修复：无线初始化默认 CN 国家码 + 固定非 DFS 信道（5.8G=149、5.2G=36 且限 80MHz），避免自动信道落入雷达信道后 5G 不广播（`002-wireless-5g-cn.patch`）。仅对未配置过的无线生效，已配置设备请在 LuCI 无线页手动改国家码/信道或不保留配置重刷
+- 5.8G 修复：无线初始化时 5.8G 固定非 DFS 信道 149，避免自动信道落入雷达信道后 5.8G 不广播（`002-wireless-58g-nodfs.patch`）；5.2G 保持上游默认不做修改。仅对未配置过的无线生效，已配置设备请在 LuCI 无线页手动改信道或不保留配置重刷
 - apk 任意安装：软件包管理器（含"Upload Package…"上传安装）附加 `--allow-untrusted`，可安装未签名/第三方 apk（`003-apk-allow-untrusted.patch`）
-- 保留 wolultra、samba4 插件
+- 不含 mini-diskmanager、wolultra、samba4、homeproxy、gecoosac、natmapt
+- 自动中继AP 带 syslog 诊断：转换被跳过时记录原因（`logread | grep router-tool` 可查看）
 
 以上默认值在 `.github/workflows/QCA-ALL.yml` 的 `with` 参数中修改。
 

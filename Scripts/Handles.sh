@@ -37,19 +37,15 @@ FIX "theme-vantage" "$PACKAGE_PATH/luci-theme-vantage" sed -i \
 	-e '/^\/\* progress bars: thin track/,$ { /^\.cbi-progressbar::before {/,/^}/ { s/^[[:space:]]*font: 500 var(--fs-micro)\/1\.2 var(--mono);/\tfont: inherit; line-height: normal;/; } }' \
 	"$PACKAGE_PATH/luci-theme-vantage/luci-theme-vantage/htdocs/luci-static/vantage/vantage.css"
 
-#修改mini-diskmanager菜单位置
-FIX "mini-diskmanager" "$PACKAGE_PATH/luci-app-mini-diskmanager" sed -i "s/services/system/g" \
-	"$PACKAGE_PATH/luci-app-mini-diskmanager/luci-app-mini-diskmanager/root/usr/share/luci/menu.d/luci-app-mini-diskmanager.json"
-
 #LAN与上游WAN同网段时自动启用中继AP模式，拓扑不满足时回退上游改网段逻辑
 FIX "auto-relay-ap" "$PACKAGE_PATH/emortal/luci-app-router-tool" patch -p1 \
 	-d "$PACKAGE_PATH/emortal/luci-app-router-tool" \
 	-i "$GITHUB_WORKSPACE/Scripts/patches/001-auto-relay-ap.patch"
 
-#5G无线默认改为CN国家码+固定非DFS信道，避免自动信道落入雷达信道导致5G不广播
-FIX "wireless-5g-cn" "$PACKAGE_PATH/emortal/luci-app-router-tool" patch -p1 \
+#5.8G无线固定非DFS信道149，避免自动信道落入雷达信道导致5.8G不广播；5.2G保持上游默认
+FIX "wireless-58g-nodfs" "$PACKAGE_PATH/emortal/luci-app-router-tool" patch -p1 \
 	-d "$PACKAGE_PATH/emortal/luci-app-router-tool" \
-	-i "$GITHUB_WORKSPACE/Scripts/patches/002-wireless-5g-cn.patch"
+	-i "$GITHUB_WORKSPACE/Scripts/patches/002-wireless-58g-nodfs.patch"
 
 #软件包管理器允许安装未签名/第三方apk
 FIX "apk-allow-untrusted" "$FEEDS_PATH/luci/applications/luci-app-package-manager" patch -p1 \

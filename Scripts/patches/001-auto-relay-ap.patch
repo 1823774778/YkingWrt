@@ -1,13 +1,14 @@
 --- a/root/usr/share/router-tool/auto.uc
 +++ b/root/usr/share/router-tool/auto.uc
-@@ -1,5 +1,6 @@
+@@ -1,5 +1,7 @@
  // Shared preset data is also used by the LuCI post-parse save callback.
  import { read_snapshot, record_option, custom_option, tracked_option, lan_context, equal, finish_snapshot } from './snapshot.uc';
 +import { readfile } from 'fs';
++import { syslog, LOG_INFO, LOG_WARNING } from 'log';
  
  function sections(uci, config, type) {
  	let result = [];
-@@ -51,6 +52,13 @@
+@@ -51,6 +53,13 @@
  	return (a.address & mask) == (b.address & mask);
  }
  
@@ -21,7 +22,7 @@
  export function synchronize(uci, data, upstream4, target) {
  	let changed = {};
  	if (uci.get_all('router-tool', 'main')?.['.type'] != 'settings')
-@@ -105,6 +113,84 @@
+@@ -105,6 +114,90 @@
  			changed[config] = true;
  		}
  	}
@@ -42,16 +43,21 @@
 +		let physical = [];
 +		for (let name in board?.network || {}) physical = concat(physical, board_ports(name));
 +		ports = unique(ports.concat(physical, wan_dev || []));
-+		if (!length(keys(board?.network || {})) || !wan_dev || match(wan_dev, /^@/)) return false;
-+		if (length(sections(uci, 'network', 'switch')) || length(sections(uci, 'network', 'switch_vlan'))) return false;
++		function skip(reason) {
++			syslog(LOG_WARNING, 'relay AP conversion skipped: %s', reason);
++			return false;
++		}
++		if (!length(keys(board?.network || {}))) return skip('board.json has no network ports');
++		if (!wan_dev || match(wan_dev, /^@/)) return skip('WAN device is not a plain interface: ' + wan_dev);
++		if (length(sections(uci, 'network', 'switch')) || length(sections(uci, 'network', 'switch_vlan'))) return skip('switch/switch_vlan sections present');
 +		for (let s in sections(uci, 'network', 'bridge-vlan'))
-+			if (s.device == bridge_name) return false;
++			if (s.device == bridge_name) return skip('bridge-vlan on ' + bridge_name);
 +		for (let s in sections(uci, 'network', 'device')) {
-+			if (s.name != bridge_name && length(filter(array(s.ports), p => index(ports, p) >= 0))) return false;
-+			if (index(ports, s.name) >= 0 && s.type && index([ '8023', 'ethernet' ], s.type) < 0) return false;
++			if (s.name != bridge_name && length(filter(array(s.ports), p => index(ports, p) >= 0))) return skip('device ' + s.name + ' owns AP ports');
++			if (index(ports, s.name) >= 0 && s.type && index([ '8023', 'ethernet' ], s.type) < 0) return skip('port ' + s.name + ' is not plain ethernet');
 +		}
 +		for (let p in ports)
-+			if (match(p, /[.@:]/) || p == bridge_name || match(p, /^(br-|wlan|phy)/)) return false;
++			if (match(p, /[.@:]/) || p == bridge_name || match(p, /^(br-|wlan|phy)/)) return skip('port name not plain ethernet: ' + p);
 +		let ap_state = { version: 1, mode: 'ap', options: [], created: [], subnet_done: true };
 +		recorder = ap_state;
 +		for (let name in [ 'lan', 'wan', 'wan6' ]) ensure('network', 'interface', name);
@@ -101,12 +107,13 @@
 +		}
 +		recorder = null;
 +		set('router-tool', 'main', { ap_state: finish_snapshot(uci, ap_state), ap_mode: '1' });
++		syslog(LOG_INFO, 'relay AP mode enabled automatically (LAN overlapped upstream WAN)');
 +		return true;
 +	}
  	let sid = sections(uci, 'network', 'globals')[0]?.['.name'] || ensure('network', 'globals', 'globals');
  	let ap = uci.get('router-tool', 'main', 'ap_mode') == '1';
  	let role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
-@@ -185,21 +271,24 @@
+@@ -185,21 +278,26 @@
  		recorder = state;
  		let upstream = filter(map(upstream4 || [], address => subnet(address)), address => address != null);
  		let lan = filter(map(array(uci.get('network', 'lan', 'ipaddr')), address => subnet(address, uci.get('network', 'lan', 'netmask'))), address => address != null);
@@ -123,8 +130,10 @@
 -				let candidate = `192.168.${i}.1/24`;
 -				if (!length(filter(occupied, b => overlaps(subnet(candidate), b)))) { address = candidate; break; }
 +		if (uci.get('network', 'lan', 'proto') == 'static' && length(filter(lan, a => length(filter(upstream, b => overlaps(a, b)))))) {
++			syslog(LOG_INFO, 'LAN subnet overlaps upstream WAN; attempting relay AP conversion');
 +			// LAN shares the upstream subnet: become a relay AP instead of renumbering.
 +			if (!stage_ap()) {
++				syslog(LOG_WARNING, 'relay AP conversion unavailable; renumbering LAN instead');
 +				let occupied = [ ...upstream ];
 +				for (let section in sections(uci, 'network', 'interface'))
 +					if (section['.name'] != 'lan')
