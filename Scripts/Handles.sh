@@ -41,6 +41,7 @@ FIX "theme-vantage" "$PACKAGE_PATH/luci-theme-vantage" sed -i \
 FIX "mini-diskmanager" "$PACKAGE_PATH/luci-app-mini-diskmanager" sed -i "s/services/system/g" \
 	"$PACKAGE_PATH/luci-app-mini-diskmanager/luci-app-mini-diskmanager/root/usr/share/luci/menu.d/luci-app-mini-diskmanager.json"
 
-#修改natmapt菜单位置
-FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
-	"$PACKAGE_PATH/luci-app-natmapt/root/usr/share/luci/menu.d/luci-app-natmap.json"
+#LAN与上游WAN同网段时自动启用中继AP模式，拓扑不满足时回退上游改网段逻辑
+FIX "auto-relay-ap" "$PACKAGE_PATH/emortal/luci-app-router-tool" patch -p1 \
+	-d "$PACKAGE_PATH/emortal/luci-app-router-tool" \
+	-i "$GITHUB_WORKSPACE/Scripts/patches/001-auto-relay-ap.patch"

@@ -1,0 +1,162 @@
+--- a/root/usr/share/router-tool/auto.uc
++++ b/root/usr/share/router-tool/auto.uc
+@@ -1,5 +1,6 @@
+ // Shared preset data is also used by the LuCI post-parse save callback.
+ import { read_snapshot, record_option, custom_option, tracked_option, lan_context, equal, finish_snapshot } from './snapshot.uc';
++import { readfile } from 'fs';
+ 
+ function sections(uci, config, type) {
+ 	let result = [];
+@@ -51,6 +52,13 @@
+ 	return (a.address & mask) == (b.address & mask);
+ }
+ 
++function unique(list) {
++	let result = [];
++	for (let value in list)
++		if (index(result, value) < 0) push(result, value);
++	return result;
++}
++
+ export function synchronize(uci, data, upstream4, target) {
+ 	let changed = {};
+ 	if (uci.get_all('router-tool', 'main')?.['.type'] != 'settings')
+@@ -105,6 +113,84 @@
+ 			changed[config] = true;
+ 		}
+ 	}
++	// Port of LuCI enableAp(): bridge all Ethernet ports and become a relay AP.
++	function stage_ap() {
++		let board = json(readfile('/etc/board.json') || '{}');
++		function board_ports(name) {
++			let n = board?.network?.[name];
++			return array(n?.ports || n?.device);
++		}
++		let device = uci.get('network', 'lan', 'device') || 'br-lan';
++		let bridge_id = find_unique('network', 'device', s => s.name == device && s.type == 'bridge');
++		let bridge = bridge_id ? uci.get_all('network', bridge_id) : null;
++		let bridge_name = bridge ? device : 'br-lan';
++		let wan_dev = uci.get('network', 'wan', 'device') || board_ports('wan')[0];
++		let ports = bridge ? array(uci.get('network', bridge_id, 'ports')) :
++			board_ports('lan').concat(device != bridge_name ? [ device ] : []);
++		let physical = [];
++		for (let name in board?.network || {}) physical = concat(physical, board_ports(name));
++		ports = unique(ports.concat(physical, wan_dev || []));
++		if (!length(keys(board?.network || {})) || !wan_dev || match(wan_dev, /^@/)) return false;
++		if (length(sections(uci, 'network', 'switch')) || length(sections(uci, 'network', 'switch_vlan'))) return false;
++		for (let s in sections(uci, 'network', 'bridge-vlan'))
++			if (s.device == bridge_name) return false;
++		for (let s in sections(uci, 'network', 'device')) {
++			if (s.name != bridge_name && length(filter(array(s.ports), p => index(ports, p) >= 0))) return false;
++			if (index(ports, s.name) >= 0 && s.type && index([ '8023', 'ethernet' ], s.type) < 0) return false;
++		}
++		for (let p in ports)
++			if (match(p, /[.@:]/) || p == bridge_name || match(p, /^(br-|wlan|phy)/)) return false;
++		let ap_state = { version: 1, mode: 'ap', options: [], created: [], subnet_done: true };
++		recorder = ap_state;
++		for (let name in [ 'lan', 'wan', 'wan6' ]) ensure('network', 'interface', name);
++		let bridge_sid = bridge_id || ensure('network', 'device', 'router_tool_bridge');
++		set('network', bridge_sid, { name: bridge_name, type: 'bridge', ports: ports });
++		set('network', 'wan', { proto: 'none', device: null, disabled: '1', auto: '0' });
++		for (let s in sections(uci, 'network', 'interface'))
++			if (index([ 'lan', 'wan', 'wan6' ], s['.name']) < 0 && index(ports, uci.get('network', s['.name'], 'device')) >= 0)
++				set('network', s['.name'], { disabled: '1', auto: '0' });
++		set('network', 'lan', { device: bridge_name, proto: 'dhcp', ipaddr: null, netmask: null, gateway: null, dns: null,
++			ip6addr: null, ip6gw: null, ip6assign: null, ip6class: null, ip6ifaceid: null, ipv6: '0', delegate: '0', disabled: null, peerdns: '1', defaultroute: '1', auto: '1' });
++		set('network', 'wan6', { proto: 'dhcpv6', device: bridge_name, reqaddress: 'try', reqprefix: 'no', delegate: '0',
++			defaultroute: '1', peerdns: '1', noslaaconly: '0', forceprefix: '0', disabled: null, auto: '1' });
++		for (let name in [ 'lan', 'wan', 'wan6' ]) {
++			ensure('dhcp', 'dhcp', name);
++			set('dhcp', name, { interface: name, ignore: '1', dhcpv4: 'disabled', ra: 'disabled', dhcpv6: 'disabled', ndp: 'disabled', master: '0', ndproxy_routing: null });
++		}
++		for (let s in sections(uci, 'wireless', 'wifi-iface')) {
++			let networks = array(uci.get('wireless', s['.name'], 'network'));
++			if (index([ 'ap', 'ap-wds' ], s.mode) >= 0 && length(filter(networks, n => index([ 'lan', 'wan', 'wan6' ], n) >= 0)))
++				set('wireless', s['.name'], { network: unique(map(networks, n => index([ 'wan', 'wan6' ], n) >= 0 ? 'lan' : n)) });
++		}
++		function zone(name) {
++			let existing = find_unique('firewall', 'zone', s => s.name == name);
++			if (existing) return existing;
++			let deleted = length(filter(previous_state?.options || [], o => o.config == 'firewall' && o.key == 'name' && o.expected == name && !uci.get_all('firewall', o.sid)));
++			return deleted ? null : reserve('firewall', 'zone', 'router_tool_' + name);
++		}
++		let zlan = zone('lan'), zwan = zone('wan');
++		for (let s in sections(uci, 'firewall', 'zone')) {
++			let networks = filter(array(uci.get('firewall', s['.name'], 'network')), n => index([ 'lan', 'wan', 'wan6' ], n) < 0);
++			if (s['.name'] == zlan) networks = concat(networks, [ 'lan', 'wan6' ]);
++			set('firewall', s['.name'], { network: length(networks) ? networks : null });
++		}
++		for (let pair in [ [ 'lan', zlan ], [ 'wan', zwan ] ])
++			set('firewall', pair[1], { name: pair[0], ...data.firewall.zones[pair[0]], masq: '0' });
++		for (let s in sections(uci, 'firewall', 'defaults')) set('firewall', s['.name'], { disable_ipv6: null });
++		let fwd_existing = find_unique('firewall', 'forwarding', s => s.src == 'lan' && s.dest == 'wan');
++		let fwd_deleted = length(filter(previous_state?.options || [], o => o.config == 'firewall' && index([ 'src', 'dest' ], o.key) >= 0 && !uci.get_all('firewall', o.sid) &&
++			length(filter(previous_state.options, p => p.config == 'firewall' && p.sid == o.sid && p.key == 'src' && p.expected == 'lan')) &&
++			length(filter(previous_state.options, p => p.config == 'firewall' && p.sid == o.sid && p.key == 'dest' && p.expected == 'wan'))));
++		let fwd = fwd_existing || (fwd_deleted ? null : reserve('firewall', 'forwarding', 'router_tool_lan_wan'));
++		set('firewall', fwd, { src: 'lan', dest: 'wan', enabled: '0', family: null });
++		for (let name, values in data.firewall.rules) {
++			let existing = find_unique('firewall', 'rule', s => s.name == name);
++			if (existing) set('firewall', existing, { enabled: '0' });
++		}
++		recorder = null;
++		set('router-tool', 'main', { ap_state: finish_snapshot(uci, ap_state), ap_mode: '1' });
++		return true;
++	}
+ 	let sid = sections(uci, 'network', 'globals')[0]?.['.name'] || ensure('network', 'globals', 'globals');
+ 	let ap = uci.get('router-tool', 'main', 'ap_mode') == '1';
+ 	let role = uci.get('network', 'wan', 'proto') == 'pppoe' ? 'main' : 'sub';
+@@ -185,21 +271,24 @@
+ 		recorder = state;
+ 		let upstream = filter(map(upstream4 || [], address => subnet(address)), address => address != null);
+ 		let lan = filter(map(array(uci.get('network', 'lan', 'ipaddr')), address => subnet(address, uci.get('network', 'lan', 'netmask'))), address => address != null);
+-		if (!state.manual_lan && uci.get('network', 'lan', 'proto') == 'static' && length(filter(lan, a => length(filter(upstream, b => overlaps(a, b)))))) {
+-			let occupied = [ ...upstream ];
+-			for (let section in sections(uci, 'network', 'interface'))
+-				if (section['.name'] != 'lan')
+-					for (let address in array(section.ipaddr)) {
+-						let parsed = subnet(address, section.netmask);
+-						if (parsed) push(occupied, parsed);
+-					}
+-			let address = null;
+-			for (let i = 2; i < 255; i++) {
+-				let candidate = `192.168.${i}.1/24`;
+-				if (!length(filter(occupied, b => overlaps(subnet(candidate), b)))) { address = candidate; break; }
++		if (uci.get('network', 'lan', 'proto') == 'static' && length(filter(lan, a => length(filter(upstream, b => overlaps(a, b)))))) {
++			// LAN shares the upstream subnet: become a relay AP instead of renumbering.
++			if (!stage_ap()) {
++				let occupied = [ ...upstream ];
++				for (let section in sections(uci, 'network', 'interface'))
++					if (section['.name'] != 'lan')
++						for (let address in array(section.ipaddr)) {
++							let parsed = subnet(address, section.netmask);
++							if (parsed) push(occupied, parsed);
++						}
++				let address = null;
++				for (let i = 2; i < 255; i++) {
++					let candidate = `192.168.${i}.1/24`;
++					if (!length(filter(occupied, b => overlaps(subnet(candidate), b)))) { address = candidate; break; }
++				}
++				if (!address) die('No non-overlapping IPv4 LAN subnet found');
++				set('network', 'lan', { ipaddr: address, netmask: null });
+ 			}
+-			if (!address) die('No non-overlapping IPv4 LAN subnet found');
+-			set('network', 'lan', { ipaddr: address, netmask: null });
+ 		}
+ 		recorder = null;
+ 		state.subnet_done = true;
+--- a/htdocs/luci-static/resources/tools/router-tool.js
++++ b/htdocs/luci-static/resources/tools/router-tool.js
+@@ -446,7 +446,11 @@
+ 					}
+ 			configureFirewall(role, context.presets.firewall);
+ 			if (role == 'sub' && !state.subnet_done && context.upstream4.length && context.upstreamProtocol == uci.get('network', 'wan', 'proto')) {
+-				avoidSubnetConflict(context);
++				try { enableAp(sid, context); }
++				catch (e) {
++					console.warn('[router-tool] Automatic AP conversion failed; falling back to subnet change: ' + e.message);
++					avoidSubnetConflict(context);
++				}
+ 				state.subnet_done = true;
+ 			}
+ 		}

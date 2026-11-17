@@ -28,9 +28,12 @@ Scripts/              Packages.sh 插件更新 / Handles.sh 修补 / Settings.sh
 
 ## 默认设置
 
-- 登录地址：`192.168.10.1`，密码：无（首次登录自行设置）
+- 登录地址：`10.10.10.1`，密码：无（首次登录自行设置）
 - 主机名 / WIFI 名称：`YkingWrt`，WIFI 密码：`12345678`
-- 主题：`vantage`，语言：简体中文
+- 主题：[vantage](https://github.com/anothaDev/luci-theme-vantage)（main 分支），语言：简体中文
+- 内置 `luci-app-wifiroam` + `wifiroam`（来自 [1823774778/meshzw](https://github.com/1823774778/meshzw)，拓扑视图与 802.11k/v/r 无缝漫游）
+- 不含 homeproxy、gecoosac、natmapt
+- 自动中继AP：LAN 与上游 WAN 下发地址同网段时，自动启用接口页（admin/network/network）的"中继AP模式"（桥接全部网口、LAN 改 DHCP、关闭本机 DHCP）；端口拓扑不满足条件时回退上游的自动改 LAN 网段逻辑。补丁见 `Scripts/patches/001-auto-relay-ap.patch`，由 Handles.sh 应用
 
 以上默认值在 `.github/workflows/QCA-ALL.yml` 的 `with` 参数中修改。
 
@@ -45,6 +48,7 @@ Scripts/              Packages.sh 插件更新 / Handles.sh 修补 / Settings.sh
 
 - 设备列表仅保留京东云亚瑟、雅典娜两款。
 - Auto-Clean 保留最近 2 个 Release、7 天运行记录（上游为全部删除）。
+- 默认地址 10.10.10.1；增删插件与自动中继AP补丁见上文"默认设置"。
 
 ## 说明
 
