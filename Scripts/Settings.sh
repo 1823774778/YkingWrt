@@ -34,19 +34,6 @@ echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
 #OTA在线升级版本标识，与Release标签时间同源
 echo "$WRT_DATE" > ./package/base-files/files/etc/xwrt-build-time
 
-#PPE/NSS硬offload依赖flow offload；保留配置升级时router-tool一次性预设不会重打，这里每次装机首启兜底
-mkdir -p ./package/base-files/files/etc/uci-defaults
-cat > ./package/base-files/files/etc/uci-defaults/993-ykingwrt-flow-offload <<'EOF'
-#!/bin/sh
-grep -q "DISTRIB_TARGET='qualcommax" /etc/openwrt_release || exit 0
-uci -q batch <<'BATCH'
-set firewall.@defaults[0].flow_offloading='1'
-set firewall.@defaults[0].flow_offloading_hw='1'
-commit firewall
-BATCH
-exit 0
-EOF
-
 #引入私有扩展配置
 if [ -f "$GITHUB_WORKSPACE/Config/PRIVATE.txt" ]; then
 	echo "Applying private configurations from PRIVATE.txt..."

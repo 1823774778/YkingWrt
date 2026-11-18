@@ -51,3 +51,8 @@ FIX "wireless-58g-nodfs" "$PACKAGE_PATH/emortal/luci-app-router-tool" patch -p1 
 FIX "apk-allow-untrusted" "$FEEDS_PATH/luci/applications/luci-app-package-manager" patch -p1 \
 	-d "$FEEDS_PATH/luci/applications/luci-app-package-manager" \
 	-i "$GITHUB_WORKSPACE/Scripts/patches/003-apk-allow-untrusted.patch"
+
+#firewall4默认配置补flow offload/hw offload=1：上游默认缺省即关闭，router-tool一次性预设失败时PPE/NSS不offload
+FIX "firewall4-offload-default" "$PACKAGE_PATH/network/config/firewall4" cp \
+	"$GITHUB_WORKSPACE/Scripts/patches/008-default-enable-flow-offload.patch" \
+	"$PACKAGE_PATH/network/config/firewall4/patches/008-default-enable-flow-offload.patch"
