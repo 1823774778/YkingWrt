@@ -30,7 +30,7 @@ Scripts/              Packages.sh 插件更新 / Handles.sh 修补 / Settings.sh
 
 - 登录地址：`10.10.10.1`，密码：无（首次登录自行设置）
 - 主机名 / WIFI 名称：`YkingWrt`，WIFI 密码：`12345678`
-- 主题：[vantage](https://github.com/anothaDev/luci-theme-vantage)（main 分支），语言：简体中文
+- 主题：[carbon](https://github.com/mrjoechen/luci-theme-carbon)（main 分支），语言：简体中文
 - 内置 `luci-app-wifiroam` + `wifiroam`（来自 [1823774778/meshzw](https://github.com/1823774778/meshzw)，拓扑视图与 802.11k/v/r 无缝漫游）
 - 内置 `luci-app-xwrt-ota`（来自 [1823774778/openwrt-ota](https://github.com/1823774778/openwrt-ota)，系统 → 在线更新：读取本仓库 Latest Release、按设备匹配 sysupgrade、SHA256 校验后刷写）；构建时写入 `/etc/xwrt-build-time`（与 Release 标签时间同源）供版本比较
 - 不含 homeproxy、gecoosac、natmapt
