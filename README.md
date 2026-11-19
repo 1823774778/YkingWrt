@@ -38,7 +38,7 @@ Scripts/              Packages.sh 插件更新 / Handles.sh 修补 / Settings.sh
 - 5.8G 修复：无线初始化时 5.8G 固定非 DFS 信道 149，避免自动信道落入雷达信道后 5.8G 不广播（`002-wireless-58g-nodfs.patch`）；5.2G 保持上游默认不做修改。仅对未配置过的无线生效，已配置设备请在 LuCI 无线页手动改信道或不保留配置重刷
 - apk 任意安装：软件包管理器（含"Upload Package…"上传安装）附加 `--allow-untrusted`，可安装未签名/第三方 apk（`003-apk-allow-untrusted.patch`）
 - 不含 mini-diskmanager、wolultra、samba4、homeproxy、gecoosac、natmapt
-- 硬件加速默认开启：firewall4 上游默认配置不含 flow offload 选项（缺省即关），靠 router-tool 一次性预设开启且失败不重试；本构建以源码补丁 `008-default-enable-flow-offload.patch` 在编译期给默认配置补 `flow_offloading=1`、`flow_offloading_hw=1`，全新刷机即硬 offload，无运行时脚本
+- 硬件加速默认开启：上游 firewall4 的 `002-default-enable-fullcone.patch`（2026-11-11 起）已把 `flow_offloading=1`、`flow_offloading_hw=1` 写入默认配置，全新刷机即硬 offload；保留配置升级的设备沿用旧值，若为 0 需手动开启一次（LuCI 防火墙页或 uci）
 - 自动中继AP 带 syslog 诊断：转换被跳过时记录原因（`logread | grep router-tool` 可查看）
 
 以上默认值在 `.github/workflows/QCA-ALL.yml` 的 `with` 参数中修改。
