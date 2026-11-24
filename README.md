@@ -89,6 +89,8 @@ GitHub Actions 的手动构建也提供 `add_fragments` 与 `remove_fragments` �
 
 不同设备会使用不同上游源码，例如 `VIKINGYFY/immortalwrt`、`immortalwrt/immortalwrt`、`LiBwrt/openwrt-6.x`、`padavanonly/immortalwrt-mt798x` 或本仓库维护的特定分支。`BUILD_TARGET_SDK` 未配置时，容器构建默认使用 `immortalwrt/sdk:openwrt-25.12`。
 
+软件包管理统一使用 apk：`compile_base.config` 里 `CONFIG_USE_APK=y`，不再构建 opkg；`openwrt-keyring` 随镜像安装校验密钥，设备首启从 `/etc/apk/repositories.d/distfeeds.list` 读取 `25.12-SNAPSHOT` 的 apk 仓库（每行一个目录 URL）。
+
 构建时会按顺序组合配置：
 
 1. 设备专用 `.config`
